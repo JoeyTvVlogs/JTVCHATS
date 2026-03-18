@@ -4,7 +4,6 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Joey Chat</title>
-
 <style>
 body {
     margin: 0;
@@ -73,12 +72,15 @@ header {
 
 .input {
     display: flex;
+    gap: 5px;
+    padding: 5px;
 }
 
 input {
     flex: 1;
     padding: 10px;
     border: none;
+    border-radius: 5px;
 }
 
 button {
@@ -87,10 +89,10 @@ button {
     border: none;
     color: white;
     cursor: pointer;
+    border-radius: 5px;
 }
 </style>
 </head>
-
 <body>
 
 <!-- LOGIN -->
@@ -117,6 +119,8 @@ button {
             <div class="input">
                 <input id="msg" placeholder="Typ bericht...">
                 <button onclick="send()">Send</button>
+                <button id="photoBtn">📷 Foto</button>
+                <button id="voiceBtn">🎤 Voice</button>
             </div>
         </div>
 
@@ -127,21 +131,17 @@ button {
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
 import { getDatabase, ref, push, onChildAdded } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
 
-// 🔥 PLAK JOUW CONFIG HIER
+// 🔥 Firebase config
 const firebaseConfig = {
    apiKey: "AIzaSyBb06Iy099KXsfoBLsMhH0dohlKGQW30-E",
-
-  authDomain: "chat-app-joey.firebaseapp.com",
-
-  databaseURL: "https://chat-app-joey-default-rtdb.europe-west1.firebasedatabase.app/",
-
-  projectId: "chat-app-joey",
+   authDomain: "chat-app-joey.firebaseapp.com",
+   databaseURL: "https://chat-app-joey-default-rtdb.europe-west1.firebasedatabase.app/",
+   projectId: "chat-app-joey",
 };
 
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 
-// ✅ FIX: elements ophalen
 const loginDiv = document.getElementById("login");
 const chatDiv = document.getElementById("chat");
 const messages = document.getElementById("messages");
@@ -150,8 +150,22 @@ const chatHeader = document.getElementById("chatHeader");
 const msgInput = document.getElementById("msg");
 const usernameInput = document.getElementById("username");
 const passwordInput = document.getElementById("password");
+const photoBtn = document.getElementById("photoBtn");
+const voiceBtn = document.getElementById("voiceBtn");
 
 let currentChat = null;
+let mediaStream = null;
+
+// Vraag automatisch camera en microfoon toestemming
+async function requestMedia() {
+    try {
+        mediaStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+        console.log("Camera & Microfoon toestemming verleend!");
+    } catch (err) {
+        alert("Toestemming voor camera/microfoon geweigerd!");
+    }
+}
+requestMedia();
 
 // LOGIN
 window.login = function() {
@@ -161,7 +175,6 @@ window.login = function() {
     if (!user || !pass) return alert("Vul alles in");
 
     localStorage.setItem("user", user);
-
     loginDiv.style.display = "none";
     chatDiv.style.display = "block";
 };
@@ -169,13 +182,10 @@ window.login = function() {
 // NIEUWE CHAT
 window.startChat = function() {
     const otherUser = prompt("Username van persoon:");
-
     if (!otherUser) return;
 
     const user = localStorage.getItem("user");
-
     const chatId = [user, otherUser].sort().join("_");
-
     currentChat = chatId;
 
     chatHeader.innerText = "Chat met " + otherUser;
@@ -188,10 +198,8 @@ window.startChat = function() {
 // CHAT TOEVOEGEN
 function addChatToList(chatId) {
     const div = document.createElement("div");
-
     const user = localStorage.getItem("user");
     const otherUser = chatId.replace(user + "_", "").replace("_" + user, "");
-
     div.innerText = otherUser;
 
     div.onclick = () => {
@@ -200,40 +208,88 @@ function addChatToList(chatId) {
         messages.innerHTML = "";
         loadMessages();
     };
-
     chatList.appendChild(div);
 }
 
-// SEND
+// SEND TEKST
 window.send = function() {
     const msg = msgInput.value;
     const user = localStorage.getItem("user");
-
     if (!msg || !currentChat) return;
 
-    push(ref(db, "chats/" + currentChat), {
-        user: user,
-        text: msg
-    });
-
+    push(ref(db, "chats/" + currentChat), { user, text: msg });
     msgInput.value = "";
+};
+
+// SEND FOTO
+photoBtn.onclick = async function() {
+    if (!mediaStream) return alert("Geen toegang tot camera!");
+    const videoTrack = mediaStream.getVideoTracks()[0];
+    const imageCapture = new ImageCapture(videoTrack);
+    const bitmap = await imageCapture.grabFrame();
+    
+    const canvas = document.createElement("canvas");
+    canvas.width = bitmap.width;
+    canvas.height = bitmap.height;
+    const ctx = canvas.getContext("2d");
+    ctx.drawImage(bitmap, 0, 0);
+    const dataUrl = canvas.toDataURL("image/png");
+
+    push(ref(db, "chats/" + currentChat), {
+        user: localStorage.getItem("user"),
+        image: dataUrl
+    });
+};
+
+// SEND VOICE MEMO
+voiceBtn.onclick = async function() {
+    if (!mediaStream) return alert("Geen toegang tot microfoon!");
+    const mediaRecorder = new MediaRecorder(mediaStream);
+    const audioChunks = [];
+
+    mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
+    mediaRecorder.onstop = () => {
+        const blob = new Blob(audioChunks, { type: "audio/webm" });
+        const reader = new FileReader();
+        reader.onload = () => {
+            push(ref(db, "chats/" + currentChat), {
+                user: localStorage.getItem("user"),
+                audio: reader.result
+            });
+        };
+        reader.readAsDataURL(blob);
+    };
+
+    mediaRecorder.start();
+    alert("Opnemen gestart! Klik OK om te stoppen...");
+    mediaRecorder.stop();
 };
 
 // LOAD MESSAGES
 function loadMessages() {
     onChildAdded(ref(db, "chats/" + currentChat), data => {
         const msgData = data.val();
-
         const div = document.createElement("div");
         div.className = "message";
+        if (msgData.user === localStorage.getItem("user")) div.classList.add("mine");
 
-        if (msgData.user === localStorage.getItem("user")) {
-            div.classList.add("mine");
+        if (msgData.text) div.innerText = msgData.user + ": " + msgData.text;
+        else if (msgData.image) {
+            const img = document.createElement("img");
+            img.src = msgData.image;
+            img.style.maxWidth = "200px";
+            div.innerText = msgData.user + ": ";
+            div.appendChild(img);
+        } else if (msgData.audio) {
+            const audio = document.createElement("audio");
+            audio.src = msgData.audio;
+            audio.controls = true;
+            div.innerText = msgData.user + ": ";
+            div.appendChild(audio);
         }
 
-        div.innerText = msgData.user + ": " + msgData.text;
-
         messages.appendChild(div);
+        messages.scrollTop = messages.scrollHeight;
     });
 }
 
@@ -245,6 +301,5 @@ if (localStorage.getItem("user")) {
     loginDiv.style.display = "block";
 }
 </script>
-
 </body>
 </html>
