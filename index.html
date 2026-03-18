@@ -119,7 +119,9 @@ button {
             <div class="input">
                 <input id="msg" placeholder="Typ bericht...">
                 <button onclick="send()">Send</button>
+                <input type="file" accept="image/*;capture=camera" id="photoInput" style="display:none">
                 <button id="photoBtn">📷 Foto</button>
+                <input type="file" accept="audio/*;capture=microphone" id="voiceInput" style="display:none">
                 <button id="voiceBtn">🎤 Voice</button>
             </div>
         </div>
@@ -142,6 +144,7 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 
+// Elementen ophalen
 const loginDiv = document.getElementById("login");
 const chatDiv = document.getElementById("chat");
 const messages = document.getElementById("messages");
@@ -151,21 +154,11 @@ const msgInput = document.getElementById("msg");
 const usernameInput = document.getElementById("username");
 const passwordInput = document.getElementById("password");
 const photoBtn = document.getElementById("photoBtn");
+const photoInput = document.getElementById("photoInput");
 const voiceBtn = document.getElementById("voiceBtn");
+const voiceInput = document.getElementById("voiceInput");
 
 let currentChat = null;
-let mediaStream = null;
-
-// Vraag automatisch camera en microfoon toestemming
-async function requestMedia() {
-    try {
-        mediaStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-        console.log("Camera & Microfoon toestemming verleend!");
-    } catch (err) {
-        alert("Toestemming voor camera/microfoon geweigerd!");
-    }
-}
-requestMedia();
 
 // LOGIN
 window.login = function() {
@@ -221,48 +214,32 @@ window.send = function() {
     msgInput.value = "";
 };
 
-// SEND FOTO
-photoBtn.onclick = async function() {
-    if (!mediaStream) return alert("Geen toegang tot camera!");
-    const videoTrack = mediaStream.getVideoTracks()[0];
-    const imageCapture = new ImageCapture(videoTrack);
-    const bitmap = await imageCapture.grabFrame();
-    
-    const canvas = document.createElement("canvas");
-    canvas.width = bitmap.width;
-    canvas.height = bitmap.height;
-    const ctx = canvas.getContext("2d");
-    ctx.drawImage(bitmap, 0, 0);
-    const dataUrl = canvas.toDataURL("image/png");
-
-    push(ref(db, "chats/" + currentChat), {
-        user: localStorage.getItem("user"),
-        image: dataUrl
-    });
+// SEND FOTO (iPhone & Android compatibel)
+photoBtn.onclick = () => photoInput.click();
+photoInput.onchange = () => {
+    if (!photoInput.files[0] || !currentChat) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+        push(ref(db, "chats/" + currentChat), {
+            user: localStorage.getItem("user"),
+            image: reader.result
+        });
+    };
+    reader.readAsDataURL(photoInput.files[0]);
 };
 
-// SEND VOICE MEMO
-voiceBtn.onclick = async function() {
-    if (!mediaStream) return alert("Geen toegang tot microfoon!");
-    const mediaRecorder = new MediaRecorder(mediaStream);
-    const audioChunks = [];
-
-    mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
-    mediaRecorder.onstop = () => {
-        const blob = new Blob(audioChunks, { type: "audio/webm" });
-        const reader = new FileReader();
-        reader.onload = () => {
-            push(ref(db, "chats/" + currentChat), {
-                user: localStorage.getItem("user"),
-                audio: reader.result
-            });
-        };
-        reader.readAsDataURL(blob);
+// SEND VOICE MEMO (iPhone & Android compatibel)
+voiceBtn.onclick = () => voiceInput.click();
+voiceInput.onchange = () => {
+    if (!voiceInput.files[0] || !currentChat) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+        push(ref(db, "chats/" + currentChat), {
+            user: localStorage.getItem("user"),
+            audio: reader.result
+        });
     };
-
-    mediaRecorder.start();
-    alert("Opnemen gestart! Klik OK om te stoppen...");
-    mediaRecorder.stop();
+    reader.readAsDataURL(voiceInput.files[0]);
 };
 
 // LOAD MESSAGES
