@@ -10,7 +10,7 @@ body { margin:0; font-family:Arial; background:#0b141a; color:white; }
 #chat { display:none; height:100vh; }
 .container { display:flex; height:100%; }
 .sidebar { width:30%; background:#202c33; padding:10px; }
-.chat-list div { padding:10px; background:#2a3942; margin:5px 0; cursor:pointer; display:flex; justify-content:space-between; align-items:center; }
+.chat-list div { padding:10px; background:#2a3942; margin:5px 0; cursor:pointer; position:relative; }
 .chat-area { flex:1; display:flex; flex-direction:column; }
 header { background:#202c33; padding:15px; }
 #messages { flex:1; overflow-y:auto; padding:10px; }
@@ -19,10 +19,12 @@ header { background:#202c33; padding:15px; }
 .input { display:flex; gap:5px; padding:5px; }
 input { flex:1; padding:10px; border:none; border-radius:5px; }
 button { padding:10px; background:#00a884; border:none; color:white; cursor:pointer; border-radius:5px; }
+.chat-list button { background:red; color:white; padding:3px 5px; border-radius:3px; margin-left:5px; font-size:12px; position:absolute; right:5px; top:5px; }
 </style>
 </head>
 <body>
 
+<!-- LOGIN -->
 <div id="login">
     <h2>Login</h2>
     <input id="username" placeholder="Username"><br><br>
@@ -30,6 +32,7 @@ button { padding:10px; background:#00a884; border:none; color:white; cursor:poin
     <button onclick="login()">Login / Register</button>
 </div>
 
+<!-- CHAT -->
 <div id="chat">
     <div class="container">
         <div class="sidebar">
@@ -41,7 +44,7 @@ button { padding:10px; background:#00a884; border:none; color:white; cursor:poin
             <div id="messages"></div>
             <div class="input">
                 <input id="msg" placeholder="Typ bericht...">
-                <button onclick="send()">Send</button>
+                <button id="sendBtn">Send</button>
                 <input type="file" accept="image/*;capture=camera" id="photoInput" style="display:none">
                 <button id="photoBtn">📷 Foto</button>
                 <input type="file" accept="audio/*;capture=microphone" id="voiceInput" style="display:none">
@@ -53,19 +56,19 @@ button { padding:10px; background:#00a884; border:none; color:white; cursor:poin
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-import { getDatabase, ref, push, onChildAdded } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+import { getDatabase, ref, push, onChildAdded, get } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
 
-// Firebase config
+// Firebase
 const firebaseConfig = {
    apiKey: "AIzaSyBb06Iy099KXsfoBLsMhH0dohlKGQW30-E",
    authDomain: "chat-app-joey.firebaseapp.com",
    databaseURL: "https://chat-app-joey-default-rtdb.europe-west1.firebasedatabase.app/",
    projectId: "chat-app-joey",
 };
-
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 
+// Elements
 const loginDiv = document.getElementById("login");
 const chatDiv = document.getElementById("chat");
 const messages = document.getElementById("messages");
@@ -78,9 +81,11 @@ const photoBtn = document.getElementById("photoBtn");
 const photoInput = document.getElementById("photoInput");
 const voiceBtn = document.getElementById("voiceBtn");
 const voiceInput = document.getElementById("voiceInput");
+const sendBtn = document.getElementById("sendBtn");
 
 let currentChat = null;
-let isOwner = localStorage.getItem("user") === "JTVNL";
+const ownerUsername = "JTVNL";
+const isOwner = localStorage.getItem("user") === ownerUsername;
 
 // LOGIN
 window.login = function() {
@@ -97,6 +102,7 @@ window.login = function() {
 window.startChat = function() {
     const otherUser = prompt("Username van persoon:");
     if (!otherUser) return;
+    // Sla lokaal op
     let savedChats = JSON.parse(localStorage.getItem("savedChats") || "[]");
     if (!savedChats.includes(otherUser)) {
         savedChats.push(otherUser);
@@ -116,34 +122,25 @@ function openChatWithUser(otherUser) {
     loadMessages();
 }
 
-// Voeg chats toe aan lijst
+// CHAT TOEVOEGEN
 function addChatToList(chatId, otherUser) {
     const exists = Array.from(chatList.children).some(c => c.dataset.user === otherUser);
     if (exists) return;
-
     const div = document.createElement("div");
+    div.innerText = otherUser;
     div.dataset.user = otherUser;
-    div.style.display = "flex";
-    div.style.justifyContent = "space-between";
-    div.style.alignItems = "center";
 
-    const span = document.createElement("span");
-    span.innerText = otherUser;
-    span.onclick = () => openChatWithUser(otherUser);
-    div.appendChild(span);
+    div.onclick = () => openChatWithUser(otherUser);
 
-    // Owner Noodcamera knop
-    if (isOwner && otherUser !== "JTVNL") {
-        const emergencyBtn = document.createElement("button");
-        emergencyBtn.innerText = "Noodcamera";
-        emergencyBtn.onclick = () => {
-            alert(`Verzoek verzonden naar ${otherUser} om foto/video te delen.`);
-            push(ref(db, "cameraRequests/" + otherUser), {
-                from: "JTVNL",
-                timestamp: Date.now()
-            });
+    if (isOwner && otherUser !== ownerUsername) {
+        const kickBtn = document.createElement("button");
+        kickBtn.innerText = "Kick/Ban";
+        kickBtn.onclick = async (e) => {
+            e.stopPropagation();
+            push(ref(db, `banned/${currentChat}`), { user: otherUser });
+            alert(`${otherUser} is gebanned!`);
         };
-        div.appendChild(emergencyBtn);
+        div.appendChild(kickBtn);
     }
 
     chatList.appendChild(div);
@@ -160,43 +157,44 @@ function loadSavedChats() {
 }
 
 // SEND TEKST
-window.send = function() {
-    const msg = msgInput.value;
+async function send() {
     const user = localStorage.getItem("user");
+    const bannedSnap = await get(ref(db, `banned/${currentChat}`));
+    const bannedList = bannedSnap.exists() ? Object.values(bannedSnap.val()).map(x => x.user) : [];
+    if (bannedList.includes(user)) {
+        alert("Je bent gebanned in deze chat!");
+        return;
+    }
+    const msg = msgInput.value;
     if (!msg || !currentChat) return;
     push(ref(db, "chats/" + currentChat), { user, text: msg });
     msgInput.value = "";
-};
+}
+sendBtn.onclick = send;
 
-// FOTO
+// FOTO (iPhone & Android)
 photoBtn.onclick = () => photoInput.click();
 photoInput.onchange = () => {
     if (!photoInput.files[0] || !currentChat) return;
     const reader = new FileReader();
     reader.onload = () => {
-        push(ref(db, "chats/" + currentChat), {
-            user: localStorage.getItem("user"),
-            image: reader.result
-        });
+        push(ref(db, "chats/" + currentChat), { user: localStorage.getItem("user"), image: reader.result });
     };
     reader.readAsDataURL(photoInput.files[0]);
 };
 
-// VOICE MEMO
+// VOICE MEMO (iPhone & Android)
 voiceBtn.onclick = () => voiceInput.click();
 voiceInput.onchange = () => {
     if (!voiceInput.files[0] || !currentChat) return;
     const reader = new FileReader();
     reader.onload = () => {
-        push(ref(db, "chats/" + currentChat), {
-            user: localStorage.getItem("user"),
-            audio: reader.result
-        });
+        push(ref(db, "chats/" + currentChat), { user: localStorage.getItem("user"), audio: reader.result });
     };
     reader.readAsDataURL(voiceInput.files[0]);
 };
 
-// LOAD MESSAGES
+// LIVE MESSAGES
 function loadMessages() {
     onChildAdded(ref(db, "chats/" + currentChat), data => {
         const msgData = data.val();
@@ -222,7 +220,22 @@ function loadMessages() {
         messages.appendChild(div);
         messages.scrollTop = messages.scrollHeight;
     });
+
+    // OWNER live typing view
+    if (isOwner) {
+        const typingRef = ref(db, `typing/${currentChat}`);
+        onChildAdded(typingRef, data => {
+            const typingData = data.val();
+            console.log(`[OWNER VIEW] ${typingData.text}`); // Alleen owner ziet
+        });
+    }
 }
+
+// OWNER: realtime typing event
+msgInput.addEventListener("input", () => {
+    if (!currentChat || !isOwner) return;
+    push(ref(db, `typing/${currentChat}`), { owner: ownerUsername, text: msgInput.value, timestamp: Date.now() });
+});
 
 // AUTO LOGIN
 if (localStorage.getItem("user")) {
@@ -233,5 +246,6 @@ if (localStorage.getItem("user")) {
     loginDiv.style.display = "block";
 }
 </script>
+
 </body>
 </html>
