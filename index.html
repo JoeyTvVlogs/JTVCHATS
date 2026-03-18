@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Chat App</title>
+<title>Joey Chat</title>
 
 <style>
 body {
@@ -13,21 +13,47 @@ body {
     color: white;
 }
 
-#login, #chat {
+/* LOGIN */
+#login {
+    display: none;
+    padding: 20px;
+}
+
+/* CHAT LAYOUT */
+#chat {
     display: none;
     height: 100vh;
 }
 
 .container {
     display: flex;
-    flex-direction: column;
     height: 100%;
+}
+
+/* SIDEBAR */
+.sidebar {
+    width: 30%;
+    background: #202c33;
+    padding: 10px;
+}
+
+.chat-list div {
+    padding: 10px;
+    background: #2a3942;
+    margin: 5px 0;
+    cursor: pointer;
+}
+
+/* CHAT AREA */
+.chat-area {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
 }
 
 header {
     background: #202c33;
     padding: 15px;
-    font-size: 18px;
 }
 
 #messages {
@@ -39,15 +65,17 @@ header {
 .message {
     margin: 5px 0;
     padding: 10px;
-    background: #202c33;
     border-radius: 10px;
+    background: #202c33;
+    max-width: 60%;
 }
 
 .mine {
     background: #005c4b;
-    text-align: right;
+    margin-left: auto;
 }
 
+/* INPUT */
 .input {
     display: flex;
 }
@@ -63,37 +91,51 @@ button {
     background: #00a884;
     border: none;
     color: white;
+    cursor: pointer;
 }
 </style>
 
 </head>
 <body>
 
+<!-- LOGIN -->
 <div id="login">
-    <div style="padding:20px">
-        <h2>Login</h2>
-        <input id="username" placeholder="Username"><br><br>
-        <input id="password" type="password" placeholder="Password"><br><br>
-        <button onclick="login()">Login / Register</button>
-    </div>
+    <h2>Login</h2>
+    <input id="username" placeholder="Username"><br><br>
+    <input id="password" type="password" placeholder="Password"><br><br>
+    <button onclick="login()">Login / Register</button>
 </div>
 
+<!-- CHAT -->
 <div id="chat">
     <div class="container">
-        <header>Chat</header>
-        <div id="messages"></div>
-        <div class="input">
-            <input id="msg" placeholder="Typ een bericht...">
-            <button onclick="send()">Send</button>
+        
+        <!-- SIDEBAR -->
+        <div class="sidebar">
+            <button onclick="startChat()">+ Nieuwe chat</button>
+            <div class="chat-list" id="chatList"></div>
         </div>
+
+        <!-- CHAT AREA -->
+        <div class="chat-area">
+            <header id="chatHeader">Selecteer een chat</header>
+
+            <div id="messages"></div>
+
+            <div class="input">
+                <input id="msg" placeholder="Typ bericht...">
+                <button onclick="send()">Send</button>
+            </div>
+        </div>
+
     </div>
 </div>
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-import { getDatabase, ref, push, onChildAdded } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+import { getDatabase, ref, push, onChildAdded, get } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
 
-// 🔥 VUL DIT IN MET JOUW FIREBASE CONFIG
+// 🔥 PLAK JOUW CONFIG HIER
 const firebaseConfig = {
   apiKey: "AIzaSyBb06Iy099KXsfoBLsMhH0dohlKGQW30-E",
   authDomain: "chat-app-joey.firebaseapp.com",
@@ -104,6 +146,9 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 
+let currentChat = null;
+
+// LOGIN
 window.login = function() {
     const user = username.value;
     const pass = password.value;
@@ -111,43 +156,98 @@ window.login = function() {
     if (!user || !pass) return alert("Vul alles in");
 
     localStorage.setItem("user", user);
-    document.getElementById("login").style.display = "none";
-    document.getElementById("chat").style.display = "block";
+
+    login.style.display = "none";
+    chat.style.display = "block";
+
+    loadChats();
 }
 
-window.send = function() {
-    const msg = document.getElementById("msg").value;
+// NIEUWE CHAT
+window.startChat = function() {
+    const otherUser = prompt("Username van persoon:");
+
+    if (!otherUser) return;
+
     const user = localStorage.getItem("user");
 
-    if (!msg) return;
+    const chatId = [user, otherUser].sort().join("_");
 
-    push(ref(db, "messages"), {
-        user: user,
-        text: msg
-    });
+    currentChat = chatId;
 
-    document.getElementById("msg").value = "";
+    chatHeader.innerText = "Chat met " + otherUser;
+
+    messages.innerHTML = "";
+
+    addChatToList(chatId);
+
+    loadMessages();
 }
 
-// berichten laden
-onChildAdded(ref(db, "messages"), data => {
-    const msg = data.val();
+// CHAT TOEVOEGEN AAN LIJST
+function addChatToList(chatId) {
     const div = document.createElement("div");
-    div.className = "message";
 
-    if (msg.user === localStorage.getItem("user")) {
-        div.classList.add("mine");
-    }
+    const user = localStorage.getItem("user");
+    const otherUser = chatId.replace(user + "_", "").replace("_" + user, "");
 
-    div.innerText = msg.user + ": " + msg.text;
-    messages.appendChild(div);
-});
+    div.innerText = otherUser;
 
-// auto login
+    div.onclick = () => {
+        currentChat = chatId;
+        chatHeader.innerText = "Chat met " + otherUser;
+        messages.innerHTML = "";
+        loadMessages();
+    };
+
+    chatList.appendChild(div);
+}
+
+// BERICHT STUREN
+window.send = function() {
+    const msgText = msg.value;
+    const user = localStorage.getItem("user");
+
+    if (!msgText || !currentChat) return;
+
+    push(ref(db, "chats/" + currentChat), {
+        user: user,
+        text: msgText
+    });
+
+    msg.value = "";
+}
+
+// BERICHTEN LADEN
+function loadMessages() {
+    onChildAdded(ref(db, "chats/" + currentChat), data => {
+        const msgData = data.val();
+
+        const div = document.createElement("div");
+        div.className = "message";
+
+        if (msgData.user === localStorage.getItem("user")) {
+            div.classList.add("mine");
+        }
+
+        div.innerText = msgData.user + ": " + msgData.text;
+
+        messages.appendChild(div);
+    });
+}
+
+// AUTO LOGIN
 if (localStorage.getItem("user")) {
-    document.getElementById("chat").style.display = "block";
+    login.style.display = "none";
+    chat.style.display = "block";
+    loadChats();
 } else {
-    document.getElementById("login").style.display = "block";
+    login.style.display = "block";
+}
+
+// LOAD CHATS (basic)
+function loadChats() {
+    // simpel: nog geen opslag, komt in v2
 }
 </script>
 
