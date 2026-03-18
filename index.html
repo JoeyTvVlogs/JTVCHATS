@@ -13,13 +13,11 @@ body {
     color: white;
 }
 
-/* LOGIN */
 #login {
     display: none;
     padding: 20px;
 }
 
-/* CHAT LAYOUT */
 #chat {
     display: none;
     height: 100vh;
@@ -30,7 +28,6 @@ body {
     height: 100%;
 }
 
-/* SIDEBAR */
 .sidebar {
     width: 30%;
     background: #202c33;
@@ -44,7 +41,6 @@ body {
     cursor: pointer;
 }
 
-/* CHAT AREA */
 .chat-area {
     flex: 1;
     display: flex;
@@ -75,7 +71,6 @@ header {
     margin-left: auto;
 }
 
-/* INPUT */
 .input {
     display: flex;
 }
@@ -94,8 +89,8 @@ button {
     cursor: pointer;
 }
 </style>
-
 </head>
+
 <body>
 
 <!-- LOGIN -->
@@ -109,17 +104,14 @@ button {
 <!-- CHAT -->
 <div id="chat">
     <div class="container">
-        
-        <!-- SIDEBAR -->
+
         <div class="sidebar">
             <button onclick="startChat()">+ Nieuwe chat</button>
-            <div class="chat-list" id="chatList"></div>
+            <div id="chatList"></div>
         </div>
 
-        <!-- CHAT AREA -->
         <div class="chat-area">
             <header id="chatHeader">Selecteer een chat</header>
-
             <div id="messages"></div>
 
             <div class="input">
@@ -133,35 +125,43 @@ button {
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-import { getDatabase, ref, push, onChildAdded, get } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+import { getDatabase, ref, push, onChildAdded } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
 
 // 🔥 PLAK JOUW CONFIG HIER
 const firebaseConfig = {
-  apiKey: "AIzaSyBb06Iy099KXsfoBLsMhH0dohlKGQW30-E",
-  authDomain: "chat-app-joey.firebaseapp.com",
-  databaseURL: "https://chat-app-joey-default-rtdb.europe-west1.firebasedatabase.app/",
-  projectId: "chat-app-joey",
+  apiKey: "YOUR_KEY",
+  authDomain: "YOUR_DOMAIN",
+  databaseURL: "YOUR_DB_URL",
+  projectId: "YOUR_ID",
 };
 
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 
+// ✅ FIX: elements ophalen
+const loginDiv = document.getElementById("login");
+const chatDiv = document.getElementById("chat");
+const messages = document.getElementById("messages");
+const chatList = document.getElementById("chatList");
+const chatHeader = document.getElementById("chatHeader");
+const msgInput = document.getElementById("msg");
+const usernameInput = document.getElementById("username");
+const passwordInput = document.getElementById("password");
+
 let currentChat = null;
 
 // LOGIN
 window.login = function() {
-    const user = username.value;
-    const pass = password.value;
+    const user = usernameInput.value;
+    const pass = passwordInput.value;
 
     if (!user || !pass) return alert("Vul alles in");
 
     localStorage.setItem("user", user);
 
-    login.style.display = "none";
-    chat.style.display = "block";
-
-    loadChats();
-}
+    loginDiv.style.display = "none";
+    chatDiv.style.display = "block";
+};
 
 // NIEUWE CHAT
 window.startChat = function() {
@@ -176,15 +176,13 @@ window.startChat = function() {
     currentChat = chatId;
 
     chatHeader.innerText = "Chat met " + otherUser;
-
     messages.innerHTML = "";
 
     addChatToList(chatId);
-
     loadMessages();
-}
+};
 
-// CHAT TOEVOEGEN AAN LIJST
+// CHAT TOEVOEGEN
 function addChatToList(chatId) {
     const div = document.createElement("div");
 
@@ -203,22 +201,22 @@ function addChatToList(chatId) {
     chatList.appendChild(div);
 }
 
-// BERICHT STUREN
+// SEND
 window.send = function() {
-    const msgText = msg.value;
+    const msg = msgInput.value;
     const user = localStorage.getItem("user");
 
-    if (!msgText || !currentChat) return;
+    if (!msg || !currentChat) return;
 
     push(ref(db, "chats/" + currentChat), {
         user: user,
-        text: msgText
+        text: msg
     });
 
-    msg.value = "";
-}
+    msgInput.value = "";
+};
 
-// BERICHTEN LADEN
+// LOAD MESSAGES
 function loadMessages() {
     onChildAdded(ref(db, "chats/" + currentChat), data => {
         const msgData = data.val();
@@ -238,16 +236,10 @@ function loadMessages() {
 
 // AUTO LOGIN
 if (localStorage.getItem("user")) {
-    login.style.display = "none";
-    chat.style.display = "block";
-    loadChats();
+    loginDiv.style.display = "none";
+    chatDiv.style.display = "block";
 } else {
-    login.style.display = "block";
-}
-
-// LOAD CHATS (basic)
-function loadChats() {
-    // simpel: nog geen opslag, komt in v2
+    loginDiv.style.display = "block";
 }
 </script>
 
