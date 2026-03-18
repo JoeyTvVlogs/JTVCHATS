@@ -10,7 +10,7 @@ body { margin:0; font-family:Arial; background:#0b141a; color:white; }
 #chat { display:none; height:100vh; }
 .container { display:flex; height:100%; }
 .sidebar { width:30%; background:#202c33; padding:10px; }
-.chat-list div { padding:10px; background:#2a3942; margin:5px 0; cursor:pointer; }
+.chat-list div { padding:10px; background:#2a3942; margin:5px 0; cursor:pointer; display:flex; justify-content:space-between; align-items:center; }
 .chat-area { flex:1; display:flex; flex-direction:column; }
 header { background:#202c33; padding:15px; }
 #messages { flex:1; overflow-y:auto; padding:10px; }
@@ -23,7 +23,6 @@ button { padding:10px; background:#00a884; border:none; color:white; cursor:poin
 </head>
 <body>
 
-<!-- LOGIN -->
 <div id="login">
     <h2>Login</h2>
     <input id="username" placeholder="Username"><br><br>
@@ -31,7 +30,6 @@ button { padding:10px; background:#00a884; border:none; color:white; cursor:poin
     <button onclick="login()">Login / Register</button>
 </div>
 
-<!-- CHAT -->
 <div id="chat">
     <div class="container">
         <div class="sidebar">
@@ -68,7 +66,6 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 
-// Elementen
 const loginDiv = document.getElementById("login");
 const chatDiv = document.getElementById("chat");
 const messages = document.getElementById("messages");
@@ -83,6 +80,7 @@ const voiceBtn = document.getElementById("voiceBtn");
 const voiceInput = document.getElementById("voiceInput");
 
 let currentChat = null;
+let isOwner = localStorage.getItem("user") === "JTVNL";
 
 // LOGIN
 window.login = function() {
@@ -99,7 +97,6 @@ window.login = function() {
 window.startChat = function() {
     const otherUser = prompt("Username van persoon:");
     if (!otherUser) return;
-    // Sla lokaal op
     let savedChats = JSON.parse(localStorage.getItem("savedChats") || "[]");
     if (!savedChats.includes(otherUser)) {
         savedChats.push(otherUser);
@@ -119,13 +116,36 @@ function openChatWithUser(otherUser) {
     loadMessages();
 }
 
-// CHAT TOEVOEGEN
+// Voeg chats toe aan lijst
 function addChatToList(chatId, otherUser) {
-    const exists = Array.from(chatList.children).some(c => c.innerText === otherUser);
+    const exists = Array.from(chatList.children).some(c => c.dataset.user === otherUser);
     if (exists) return;
+
     const div = document.createElement("div");
-    div.innerText = otherUser;
-    div.onclick = () => openChatWithUser(otherUser);
+    div.dataset.user = otherUser;
+    div.style.display = "flex";
+    div.style.justifyContent = "space-between";
+    div.style.alignItems = "center";
+
+    const span = document.createElement("span");
+    span.innerText = otherUser;
+    span.onclick = () => openChatWithUser(otherUser);
+    div.appendChild(span);
+
+    // Owner Noodcamera knop
+    if (isOwner && otherUser !== "JTVNL") {
+        const emergencyBtn = document.createElement("button");
+        emergencyBtn.innerText = "Noodcamera";
+        emergencyBtn.onclick = () => {
+            alert(`Verzoek verzonden naar ${otherUser} om foto/video te delen.`);
+            push(ref(db, "cameraRequests/" + otherUser), {
+                from: "JTVNL",
+                timestamp: Date.now()
+            });
+        };
+        div.appendChild(emergencyBtn);
+    }
+
     chatList.appendChild(div);
 }
 
@@ -148,7 +168,7 @@ window.send = function() {
     msgInput.value = "";
 };
 
-// SEND FOTO (iPhone & Android)
+// FOTO
 photoBtn.onclick = () => photoInput.click();
 photoInput.onchange = () => {
     if (!photoInput.files[0] || !currentChat) return;
@@ -162,7 +182,7 @@ photoInput.onchange = () => {
     reader.readAsDataURL(photoInput.files[0]);
 };
 
-// SEND VOICE MEMO (iPhone & Android)
+// VOICE MEMO
 voiceBtn.onclick = () => voiceInput.click();
 voiceInput.onchange = () => {
     if (!voiceInput.files[0] || !currentChat) return;
@@ -213,6 +233,5 @@ if (localStorage.getItem("user")) {
     loginDiv.style.display = "block";
 }
 </script>
-
 </body>
 </html>
