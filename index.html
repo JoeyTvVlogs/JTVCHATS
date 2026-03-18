@@ -5,92 +5,20 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Joey Chat</title>
 <style>
-body {
-    margin: 0;
-    font-family: Arial;
-    background: #0b141a;
-    color: white;
-}
-
-#login {
-    display: none;
-    padding: 20px;
-}
-
-#chat {
-    display: none;
-    height: 100vh;
-}
-
-.container {
-    display: flex;
-    height: 100%;
-}
-
-.sidebar {
-    width: 30%;
-    background: #202c33;
-    padding: 10px;
-}
-
-.chat-list div {
-    padding: 10px;
-    background: #2a3942;
-    margin: 5px 0;
-    cursor: pointer;
-}
-
-.chat-area {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-}
-
-header {
-    background: #202c33;
-    padding: 15px;
-}
-
-#messages {
-    flex: 1;
-    overflow-y: auto;
-    padding: 10px;
-}
-
-.message {
-    margin: 5px 0;
-    padding: 10px;
-    border-radius: 10px;
-    background: #202c33;
-    max-width: 60%;
-}
-
-.mine {
-    background: #005c4b;
-    margin-left: auto;
-}
-
-.input {
-    display: flex;
-    gap: 5px;
-    padding: 5px;
-}
-
-input {
-    flex: 1;
-    padding: 10px;
-    border: none;
-    border-radius: 5px;
-}
-
-button {
-    padding: 10px;
-    background: #00a884;
-    border: none;
-    color: white;
-    cursor: pointer;
-    border-radius: 5px;
-}
+body { margin:0; font-family:Arial; background:#0b141a; color:white; }
+#login { display:none; padding:20px; }
+#chat { display:none; height:100vh; }
+.container { display:flex; height:100%; }
+.sidebar { width:30%; background:#202c33; padding:10px; }
+.chat-list div { padding:10px; background:#2a3942; margin:5px 0; cursor:pointer; }
+.chat-area { flex:1; display:flex; flex-direction:column; }
+header { background:#202c33; padding:15px; }
+#messages { flex:1; overflow-y:auto; padding:10px; }
+.message { margin:5px 0; padding:10px; border-radius:10px; background:#202c33; max-width:60%; }
+.mine { background:#005c4b; margin-left:auto; }
+.input { display:flex; gap:5px; padding:5px; }
+input { flex:1; padding:10px; border:none; border-radius:5px; }
+button { padding:10px; background:#00a884; border:none; color:white; cursor:pointer; border-radius:5px; }
 </style>
 </head>
 <body>
@@ -106,16 +34,13 @@ button {
 <!-- CHAT -->
 <div id="chat">
     <div class="container">
-
         <div class="sidebar">
             <button onclick="startChat()">+ Nieuwe chat</button>
             <div id="chatList"></div>
         </div>
-
         <div class="chat-area">
             <header id="chatHeader">Selecteer een chat</header>
             <div id="messages"></div>
-
             <div class="input">
                 <input id="msg" placeholder="Typ bericht...">
                 <button onclick="send()">Send</button>
@@ -125,7 +50,6 @@ button {
                 <button id="voiceBtn">🎤 Voice</button>
             </div>
         </div>
-
     </div>
 </div>
 
@@ -133,7 +57,7 @@ button {
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
 import { getDatabase, ref, push, onChildAdded } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
 
-// 🔥 Firebase config
+// Firebase config
 const firebaseConfig = {
    apiKey: "AIzaSyBb06Iy099KXsfoBLsMhH0dohlKGQW30-E",
    authDomain: "chat-app-joey.firebaseapp.com",
@@ -144,7 +68,7 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 
-// Elementen ophalen
+// Elementen
 const loginDiv = document.getElementById("login");
 const chatDiv = document.getElementById("chat");
 const messages = document.getElementById("messages");
@@ -164,44 +88,55 @@ let currentChat = null;
 window.login = function() {
     const user = usernameInput.value;
     const pass = passwordInput.value;
-
     if (!user || !pass) return alert("Vul alles in");
-
     localStorage.setItem("user", user);
     loginDiv.style.display = "none";
     chatDiv.style.display = "block";
+    loadSavedChats();
 };
 
 // NIEUWE CHAT
 window.startChat = function() {
     const otherUser = prompt("Username van persoon:");
     if (!otherUser) return;
+    // Sla lokaal op
+    let savedChats = JSON.parse(localStorage.getItem("savedChats") || "[]");
+    if (!savedChats.includes(otherUser)) {
+        savedChats.push(otherUser);
+        localStorage.setItem("savedChats", JSON.stringify(savedChats));
+    }
+    openChatWithUser(otherUser);
+};
 
+// Open chat
+function openChatWithUser(otherUser) {
     const user = localStorage.getItem("user");
     const chatId = [user, otherUser].sort().join("_");
     currentChat = chatId;
-
     chatHeader.innerText = "Chat met " + otherUser;
     messages.innerHTML = "";
-
-    addChatToList(chatId);
+    addChatToList(chatId, otherUser);
     loadMessages();
-};
+}
 
 // CHAT TOEVOEGEN
-function addChatToList(chatId) {
+function addChatToList(chatId, otherUser) {
+    const exists = Array.from(chatList.children).some(c => c.innerText === otherUser);
+    if (exists) return;
     const div = document.createElement("div");
-    const user = localStorage.getItem("user");
-    const otherUser = chatId.replace(user + "_", "").replace("_" + user, "");
     div.innerText = otherUser;
-
-    div.onclick = () => {
-        currentChat = chatId;
-        chatHeader.innerText = "Chat met " + otherUser;
-        messages.innerHTML = "";
-        loadMessages();
-    };
+    div.onclick = () => openChatWithUser(otherUser);
     chatList.appendChild(div);
+}
+
+// Laad opgeslagen chats
+function loadSavedChats() {
+    const savedChats = JSON.parse(localStorage.getItem("savedChats") || "[]");
+    savedChats.forEach(otherUser => {
+        const user = localStorage.getItem("user");
+        const chatId = [user, otherUser].sort().join("_");
+        addChatToList(chatId, otherUser);
+    });
 }
 
 // SEND TEKST
@@ -209,12 +144,11 @@ window.send = function() {
     const msg = msgInput.value;
     const user = localStorage.getItem("user");
     if (!msg || !currentChat) return;
-
     push(ref(db, "chats/" + currentChat), { user, text: msg });
     msgInput.value = "";
 };
 
-// SEND FOTO (iPhone & Android compatibel)
+// SEND FOTO (iPhone & Android)
 photoBtn.onclick = () => photoInput.click();
 photoInput.onchange = () => {
     if (!photoInput.files[0] || !currentChat) return;
@@ -228,7 +162,7 @@ photoInput.onchange = () => {
     reader.readAsDataURL(photoInput.files[0]);
 };
 
-// SEND VOICE MEMO (iPhone & Android compatibel)
+// SEND VOICE MEMO (iPhone & Android)
 voiceBtn.onclick = () => voiceInput.click();
 voiceInput.onchange = () => {
     if (!voiceInput.files[0] || !currentChat) return;
@@ -274,9 +208,11 @@ function loadMessages() {
 if (localStorage.getItem("user")) {
     loginDiv.style.display = "none";
     chatDiv.style.display = "block";
+    loadSavedChats();
 } else {
     loginDiv.style.display = "block";
 }
 </script>
+
 </body>
 </html>
