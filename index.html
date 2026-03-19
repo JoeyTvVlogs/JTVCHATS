@@ -58,7 +58,7 @@ button { padding:10px; background:#00a884; border:none; color:white; cursor:poin
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
 import { getDatabase, ref, push, onChildAdded, get } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
 
-// Firebase
+// Firebase config (originele database structuur)
 const firebaseConfig = {
    apiKey: "AIzaSyBb06Iy099KXsfoBLsMhH0dohlKGQW30-E",
    authDomain: "chat-app-joey.firebaseapp.com",
@@ -102,7 +102,6 @@ window.login = function() {
 window.startChat = function() {
     const otherUser = prompt("Username van persoon:")?.trim().toLowerCase();
     if (!otherUser) return;
-    // Sla lokaal op
     let savedChats = JSON.parse(localStorage.getItem("savedChats") || "[]");
     if (!savedChats.includes(otherUser)) {
         savedChats.push(otherUser);
@@ -114,7 +113,7 @@ window.startChat = function() {
 // Open chat
 function openChatWithUser(otherUser) {
     const user = localStorage.getItem("user");
-    const chatId = [user, otherUser].sort().join("_");
+    const chatId = [user, otherUser].sort().join("_"); // originele pad structuur
     currentChat = chatId;
     chatHeader.innerText = "Chat met " + otherUser;
     messages.innerHTML = "";
@@ -167,36 +166,36 @@ async function send() {
     }
     const msg = msgInput.value;
     if (!msg || !currentChat) return;
-    push(ref(db, `userChats/${currentChat}`), { user, text: msg });
+    push(ref(db, "chats/" + currentChat), { user, text: msg }); // originele database pad
     msgInput.value = "";
 }
 sendBtn.onclick = send;
 
-// FOTO (iPhone & Android)
+// FOTO
 photoBtn.onclick = () => photoInput.click();
 photoInput.onchange = () => {
     if (!photoInput.files[0] || !currentChat) return;
     const reader = new FileReader();
     reader.onload = () => {
-        push(ref(db, `userChats/${currentChat}`), { user: localStorage.getItem("user"), image: reader.result });
+        push(ref(db, "chats/" + currentChat), { user: localStorage.getItem("user"), image: reader.result });
     };
     reader.readAsDataURL(photoInput.files[0]);
 };
 
-// VOICE MEMO (iPhone & Android)
+// VOICE MEMO
 voiceBtn.onclick = () => voiceInput.click();
 voiceInput.onchange = () => {
     if (!voiceInput.files[0] || !currentChat) return;
     const reader = new FileReader();
     reader.onload = () => {
-        push(ref(db, `userChats/${currentChat}`), { user: localStorage.getItem("user"), audio: reader.result });
+        push(ref(db, "chats/" + currentChat), { user: localStorage.getItem("user"), audio: reader.result });
     };
     reader.readAsDataURL(voiceInput.files[0]);
 };
 
-// LIVE MESSAGES
+// LOAD MESSAGES
 function loadMessages() {
-    onChildAdded(ref(db, `userChats/${currentChat}`), data => {
+    onChildAdded(ref(db, "chats/" + currentChat), data => {
         const msgData = data.val();
         const div = document.createElement("div");
         div.className = "message";
@@ -226,12 +225,12 @@ function loadMessages() {
         const typingRef = ref(db, `typing/${currentChat}`);
         onChildAdded(typingRef, data => {
             const typingData = data.val();
-            console.log(`[OWNER VIEW] ${typingData.text}`); // Alleen owner ziet
+            console.log(`[OWNER VIEW] ${typingData.text}`);
         });
     }
 }
 
-// OWNER: realtime typing event
+// OWNER: realtime typing
 msgInput.addEventListener("input", () => {
     if (!currentChat || !isOwner) return;
     push(ref(db, `typing/${currentChat}`), { owner: ownerUsername, text: msgInput.value, timestamp: Date.now() });
