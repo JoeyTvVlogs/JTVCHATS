@@ -85,11 +85,11 @@ const sendBtn = document.getElementById("sendBtn");
 
 let currentChat = null;
 const ownerUsername = "JTVNL";
-const isOwner = localStorage.getItem("user") === ownerUsername;
+const isOwner = localStorage.getItem("user")?.toLowerCase() === ownerUsername.toLowerCase();
 
 // LOGIN
 window.login = function() {
-    const user = usernameInput.value;
+    const user = usernameInput.value.trim().toLowerCase();
     const pass = passwordInput.value;
     if (!user || !pass) return alert("Vul alles in");
     localStorage.setItem("user", user);
@@ -100,7 +100,7 @@ window.login = function() {
 
 // NIEUWE CHAT
 window.startChat = function() {
-    const otherUser = prompt("Username van persoon:");
+    const otherUser = prompt("Username van persoon:")?.trim().toLowerCase();
     if (!otherUser) return;
     // Sla lokaal op
     let savedChats = JSON.parse(localStorage.getItem("savedChats") || "[]");
@@ -132,7 +132,7 @@ function addChatToList(chatId, otherUser) {
 
     div.onclick = () => openChatWithUser(otherUser);
 
-    if (isOwner && otherUser !== ownerUsername) {
+    if (isOwner && otherUser !== ownerUsername.toLowerCase()) {
         const kickBtn = document.createElement("button");
         kickBtn.innerText = "Kick/Ban";
         kickBtn.onclick = async (e) => {
@@ -167,7 +167,7 @@ async function send() {
     }
     const msg = msgInput.value;
     if (!msg || !currentChat) return;
-    push(ref(db, "chats/" + currentChat), { user, text: msg });
+    push(ref(db, `userChats/${currentChat}`), { user, text: msg });
     msgInput.value = "";
 }
 sendBtn.onclick = send;
@@ -178,7 +178,7 @@ photoInput.onchange = () => {
     if (!photoInput.files[0] || !currentChat) return;
     const reader = new FileReader();
     reader.onload = () => {
-        push(ref(db, "chats/" + currentChat), { user: localStorage.getItem("user"), image: reader.result });
+        push(ref(db, `userChats/${currentChat}`), { user: localStorage.getItem("user"), image: reader.result });
     };
     reader.readAsDataURL(photoInput.files[0]);
 };
@@ -189,14 +189,14 @@ voiceInput.onchange = () => {
     if (!voiceInput.files[0] || !currentChat) return;
     const reader = new FileReader();
     reader.onload = () => {
-        push(ref(db, "chats/" + currentChat), { user: localStorage.getItem("user"), audio: reader.result });
+        push(ref(db, `userChats/${currentChat}`), { user: localStorage.getItem("user"), audio: reader.result });
     };
     reader.readAsDataURL(voiceInput.files[0]);
 };
 
 // LIVE MESSAGES
 function loadMessages() {
-    onChildAdded(ref(db, "chats/" + currentChat), data => {
+    onChildAdded(ref(db, `userChats/${currentChat}`), data => {
         const msgData = data.val();
         const div = document.createElement("div");
         div.className = "message";
