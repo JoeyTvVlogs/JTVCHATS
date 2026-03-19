@@ -1,23 +1,46 @@
 import { db } from "./firebase.js";
 import { ref, push, onChildAdded, get, off } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
 
-// 🔒 AUTH CHECK
+// 🔒 AUTH
 const currentUser = localStorage.getItem("user");
-
-if(!currentUser){
-  window.location.href = "login.html";
-}
+if(!currentUser) window.location.href = "login.html";
 
 // ELEMENTS
 const messages = document.getElementById("messages");
 const chatHeader = document.getElementById("chatHeader");
 const msgInput = document.getElementById("msg");
 const chatList = document.getElementById("chatList");
+const searchInput = document.getElementById("search");
 
 let currentChat = null;
 let currentListener = null;
 
-// START CHAT
+// 🔍 SEARCH USERS
+searchInput.oninput = async function(){
+  const value = searchInput.value.toLowerCase();
+  chatList.innerHTML = "";
+
+  const snapshot = await get(ref(db, "users"));
+
+  snapshot.forEach(child => {
+    const user = child.key;
+
+    if(user.includes(value) && user !== currentUser){
+      const div = document.createElement("div");
+      div.innerText = user;
+
+      div.onclick = () => {
+        openChat(user);
+        saveChat(user);
+        searchInput.value = "";
+      };
+
+      chatList.appendChild(div);
+    }
+  });
+};
+
+// ➕ START CHAT (fallback knop)
 window.startChat = async function(){
   const other = prompt("Username")?.toLowerCase();
   if(!other) return;
@@ -25,25 +48,45 @@ window.startChat = async function(){
   const snap = await get(ref(db, "users/" + other));
   if(!snap.exists()) return alert("User bestaat niet");
 
+  openChat(other);
+  saveChat(other);
+};
+
+// 💾 SAVE CHAT
+function saveChat(user){
   let saved = JSON.parse(localStorage.getItem("savedChats") || "[]");
 
-  if(!saved.includes(other)){
-    saved.push(other);
+  if(!saved.includes(user)){
+    saved.push(user);
     localStorage.setItem("savedChats", JSON.stringify(saved));
   }
 
-  openChat(other);
   loadSavedChats();
 }
 
-// OPEN CHAT
+// 📂 LOAD SAVED CHATS
+function loadSavedChats(){
+  chatList.innerHTML = "";
+
+  const saved = JSON.parse(localStorage.getItem("savedChats") || []);
+
+  saved.forEach(user => {
+    const div = document.createElement("div");
+    div.innerText = user;
+    div.onclick = () => openChat(user);
+    chatList.appendChild(div);
+  });
+}
+
+// 💬 OPEN CHAT
 function openChat(other){
   currentChat = [currentUser, other].sort().join("_");
   chatHeader.innerText = "Chat met " + other;
+
   loadMessages();
 }
 
-// LOAD MESSAGES
+// 📥 LOAD MESSAGES
 function loadMessages(){
   if(currentListener) off(currentListener);
 
@@ -54,25 +97,19 @@ function loadMessages(){
 
   // oude berichten
   get(chatRef).then(snapshot => {
-    snapshot.forEach(child => {
-      renderMessage(child.val());
-    });
+    snapshot.forEach(child => renderMessage(child.val()));
   });
 
   // nieuwe berichten
-  onChildAdded(chatRef, data => {
-    renderMessage(data.val());
-  });
+  onChildAdded(chatRef, data => renderMessage(data.val()));
 }
 
-// RENDER
+// 🎨 RENDER
 function renderMessage(msg){
   const div = document.createElement("div");
   div.className = "message";
 
-  if(msg.user === currentUser){
-    div.classList.add("mine");
-  }
+  if(msg.user === currentUser) div.classList.add("mine");
 
   div.innerText = msg.user + ": " + msg.text;
 
@@ -80,7 +117,7 @@ function renderMessage(msg){
   messages.scrollTop = messages.scrollHeight;
 }
 
-// SEND
+// 📤 SEND
 window.send = function(){
   const text = msgInput.value;
   if(!text || !currentChat) return;
@@ -93,21 +130,7 @@ window.send = function(){
   msgInput.value = "";
 }
 
-// LOAD CHAT LIST
-function loadSavedChats(){
-  chatList.innerHTML = "";
-
-  const saved = JSON.parse(localStorage.getItem("savedChats") || "[]");
-
-  saved.forEach(user => {
-    const div = document.createElement("div");
-    div.innerText = user;
-    div.onclick = () => openChat(user);
-    chatList.appendChild(div);
-  });
-}
-
-// LOGOUT
+// 🚪 LOGOUT
 window.logout = function(){
   localStorage.removeItem("user");
   window.location.href = "login.html";
