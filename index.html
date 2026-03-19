@@ -20,6 +20,7 @@ header { background:#202c33; padding:15px; }
 input { flex:1; padding:10px; border:none; border-radius:5px; }
 button { padding:10px; background:#00a884; border:none; color:white; cursor:pointer; border-radius:5px; }
 .chat-list button { background:red; color:white; padding:3px 5px; border-radius:3px; margin-left:5px; font-size:12px; position:absolute; right:5px; top:5px; }
+#notifToggle { margin-top:10px; }
 </style>
 </head>
 <body>
@@ -38,6 +39,7 @@ button { padding:10px; background:#00a884; border:none; color:white; cursor:poin
         <div class="sidebar">
             <button onclick="startChat()">+ Nieuwe chat</button>
             <div id="chatList"></div>
+            <label><input type="checkbox" id="notifToggle"> Meldingen aan</label>
         </div>
         <div class="chat-area">
             <header id="chatHeader">Selecteer een chat</header>
@@ -58,7 +60,7 @@ button { padding:10px; background:#00a884; border:none; color:white; cursor:poin
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
 import { getDatabase, ref, push, onChildAdded, get } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
 
-// Firebase config (originele database structuur)
+// Firebase config
 const firebaseConfig = {
    apiKey: "AIzaSyBb06Iy099KXsfoBLsMhH0dohlKGQW30-E",
    authDomain: "chat-app-joey.firebaseapp.com",
@@ -82,10 +84,22 @@ const photoInput = document.getElementById("photoInput");
 const voiceBtn = document.getElementById("voiceBtn");
 const voiceInput = document.getElementById("voiceInput");
 const sendBtn = document.getElementById("sendBtn");
+const notifToggle = document.getElementById("notifToggle");
 
 let currentChat = null;
 const ownerUsername = "JTVNL";
 const isOwner = localStorage.getItem("user")?.toLowerCase() === ownerUsername.toLowerCase();
+let notifEnabled = false;
+
+// Notificaties toestemming
+if ("Notification" in window) {
+    Notification.requestPermission().then(p => { if(p==="granted") console.log("Notifications ✅"); });
+}
+
+notifToggle.addEventListener("change", () => {
+    notifEnabled = notifToggle.checked;
+    if (notifEnabled && Notification.permission !== "granted") Notification.requestPermission();
+});
 
 // LOGIN
 window.login = function() {
@@ -113,7 +127,7 @@ window.startChat = function() {
 // Open chat
 function openChatWithUser(otherUser) {
     const user = localStorage.getItem("user");
-    const chatId = [user, otherUser].sort().join("_"); // originele pad structuur
+    const chatId = [user, otherUser].sort().join("_");
     currentChat = chatId;
     chatHeader.innerText = "Chat met " + otherUser;
     messages.innerHTML = "";
@@ -128,7 +142,6 @@ function addChatToList(chatId, otherUser) {
     const div = document.createElement("div");
     div.innerText = otherUser;
     div.dataset.user = otherUser;
-
     div.onclick = () => openChatWithUser(otherUser);
 
     if (isOwner && otherUser !== ownerUsername.toLowerCase()) {
@@ -141,7 +154,6 @@ function addChatToList(chatId, otherUser) {
         };
         div.appendChild(kickBtn);
     }
-
     chatList.appendChild(div);
 }
 
@@ -160,13 +172,10 @@ async function send() {
     const user = localStorage.getItem("user");
     const bannedSnap = await get(ref(db, `banned/${currentChat}`));
     const bannedList = bannedSnap.exists() ? Object.values(bannedSnap.val()).map(x => x.user) : [];
-    if (bannedList.includes(user)) {
-        alert("Je bent gebanned in deze chat!");
-        return;
-    }
+    if (bannedList.includes(user)) { alert("Je bent gebanned!"); return; }
     const msg = msgInput.value;
     if (!msg || !currentChat) return;
-    push(ref(db, "chats/" + currentChat), { user, text: msg }); // originele database pad
+    push(ref(db, "chats/" + currentChat), { user, text: msg });
     msgInput.value = "";
 }
 sendBtn.onclick = send;
@@ -218,6 +227,13 @@ function loadMessages() {
 
         messages.appendChild(div);
         messages.scrollTop = messages.scrollHeight;
+
+        // 🔔 Notifications
+        if (notifEnabled && msgData.user !== localStorage.getItem("user") && Notification.permission === "granted") {
+            new Notification(`Nieuw bericht van ${msgData.user}`, {
+                body: msgData.text || (msgData.image ? "📷 Foto" : "🎤 Voice message")
+            });
+        }
     });
 
     // OWNER live typing view
@@ -230,7 +246,7 @@ function loadMessages() {
     }
 }
 
-// OWNER: realtime typing
+// OWNER realtime typing
 msgInput.addEventListener("input", () => {
     if (!currentChat || !isOwner) return;
     push(ref(db, `typing/${currentChat}`), { owner: ownerUsername, text: msgInput.value, timestamp: Date.now() });
