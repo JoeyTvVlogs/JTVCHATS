@@ -1,7 +1,7 @@
 import { db } from "./firebase.js";
 import { ref, push, onChildAdded, get, off } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
 
-// 🔒 AUTH
+// 🔒 AUTH CHECK
 const currentUser = localStorage.getItem("user");
 if(!currentUser) window.location.href = "login.html";
 
@@ -40,7 +40,7 @@ searchInput.oninput = async function(){
   });
 };
 
-// ➕ START CHAT (fallback knop)
+// ➕ START CHAT (fallback)
 window.startChat = async function(){
   const other = prompt("Username")?.toLowerCase();
   if(!other) return;
@@ -68,12 +68,14 @@ function saveChat(user){
 function loadSavedChats(){
   chatList.innerHTML = "";
 
-  const saved = JSON.parse(localStorage.getItem("savedChats") || []);
+  const saved = JSON.parse(localStorage.getItem("savedChats") || "[]");
 
   saved.forEach(user => {
     const div = document.createElement("div");
     div.innerText = user;
+
     div.onclick = () => openChat(user);
+
     chatList.appendChild(div);
   });
 }
@@ -97,11 +99,15 @@ function loadMessages(){
 
   // oude berichten
   get(chatRef).then(snapshot => {
-    snapshot.forEach(child => renderMessage(child.val()));
+    snapshot.forEach(child => {
+      renderMessage(child.val());
+    });
   });
 
   // nieuwe berichten
-  onChildAdded(chatRef, data => renderMessage(data.val()));
+  onChildAdded(chatRef, data => {
+    renderMessage(data.val());
+  });
 }
 
 // 🎨 RENDER
@@ -109,7 +115,9 @@ function renderMessage(msg){
   const div = document.createElement("div");
   div.className = "message";
 
-  if(msg.user === currentUser) div.classList.add("mine");
+  if(msg.user === currentUser){
+    div.classList.add("mine");
+  }
 
   div.innerText = msg.user + ": " + msg.text;
 
