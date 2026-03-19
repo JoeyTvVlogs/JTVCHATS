@@ -1,23 +1,27 @@
 import { db } from "./firebase.js";
 import { ref, get, set } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
 
+// 🔒 als al ingelogd → naar chat
+if(localStorage.getItem("user")){
+  window.location.href = "index.html";
+}
+
 const usernameInput = document.getElementById("username");
 
 window.login = async function(){
- const user = usernameInput.value.trim().toLowerCase();
- if(!user) return alert("Username nodig");
+  const user = usernameInput.value.trim().toLowerCase();
 
- const userRef = ref(db, "users/" + user);
- const snapshot = await get(userRef);
+  if(!user) return alert("Username nodig");
 
- if(!snapshot.exists()){
-   const confirmCreate = confirm("Account bestaat niet. Aanmaken?");
-   if(!confirmCreate) return;
-   await set(userRef, true);
- }
+  const userRef = ref(db, "users/" + user);
+  const snapshot = await get(userRef);
 
- localStorage.setItem("user", user);
+  if(!snapshot.exists()){
+    const confirmCreate = confirm("Account bestaat niet. Aanmaken?");
+    if(!confirmCreate) return;
+    await set(userRef, true);
+  }
 
- // 👉 redirect naar chat
- window.location.href = "index.html";
+  localStorage.setItem("user", user);
+  window.location.href = "index.html";
 }
