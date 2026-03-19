@@ -1,7 +1,7 @@
 import { db } from "./firebase.js";
 import { ref, get, set } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
 
-// 🔒 als al ingelogd → naar chat
+// 🔒 redirect als al ingelogd
 if(localStorage.getItem("user")){
   window.location.href = "index.html";
 }
@@ -10,7 +10,6 @@ const usernameInput = document.getElementById("username");
 
 window.login = async function(){
   const user = usernameInput.value.trim().toLowerCase();
-
   if(!user) return alert("Username nodig");
 
   const userRef = ref(db, "users/" + user);
