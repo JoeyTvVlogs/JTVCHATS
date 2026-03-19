@@ -1,0 +1,41 @@
+body {
+  margin:0;
+  font-family:sans-serif;
+  background:#0f1b26;
+  color:white;
+}
+
+#chat {
+  display:flex;
+  height:100vh;
+}
+
+.sidebar {
+  width:30%;
+  background:#1e2a38;
+  padding:10px;
+}
+
+.chat-area {
+  flex:1;
+  display:flex;
+  flex-direction:column;
+}
+
+#messages {
+  flex:1;
+  padding:10px;
+  overflow-y:auto;
+}
+
+.message {
+  background:#2a3942;
+  padding:10px;
+  margin:5px 0;
+  border-radius:10px;
+}
+
+.mine {
+  background:#00a884;
+  margin-left:auto;
+}
