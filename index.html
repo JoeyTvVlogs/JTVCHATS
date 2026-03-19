@@ -10,15 +10,16 @@
 <div id="chat">
   <div class="sidebar">
     <button onclick="startChat()">+ Chat</button>
+    <button onclick="logout()">Logout</button>
     <div id="chatList"></div>
   </div>
 
   <div class="chat-area">
-    <header id="chatHeader"></header>
+    <header id="chatHeader">Selecteer chat</header>
     <div id="messages"></div>
 
     <div class="input">
-      <input id="msg">
+      <input id="msg" placeholder="Typ bericht...">
       <button onclick="send()">Send</button>
     </div>
   </div>
